@@ -1,17 +1,8 @@
-#include <lexy/callback/adapter.hpp>
-#include <lexy/callback/object.hpp>
-#include <lexy/callback/string.hpp>
-#include <lexy/dsl/ascii.hpp>
-#include <lexy/dsl/brackets.hpp>
-#include <lexy/dsl/expression.hpp>
-#include <lexy/dsl/identifier.hpp>
-#include <lexy/dsl/production.hpp>
+#include <lexy/callback.hpp>
+#include <lexy/dsl.hpp>
 #include <memory>
 #include <string>
 #include <utility>
-
-// remove me pls
-#include <lexy/callback/forward.hpp>
 
 // input & parse action
 #include <iostream>
@@ -67,10 +58,10 @@ namespace grammar {
 
 namespace dsl = lexy::dsl;
 
-// struct whitespace {
-//     static constexpr auto rule = dsl::whitespace(dsl::ascii::space);
-// };
-// static constexpr auto ws = dsl::inline_<whitespace>;
+struct whitespace {
+    static constexpr auto rule = dsl::whitespace(dsl::ascii::space);
+};
+static constexpr auto ws = dsl::inline_<whitespace>;
 
 struct identifier {
     static constexpr auto rule = [] {
@@ -93,15 +84,22 @@ struct variable {
 
 struct abstraction {
     static constexpr auto rule =
-        dsl::lit_c<'\\'> >> dsl::p<identifier> + dsl::lit_c<'.'> + dsl::recurse<struct expression>;
+        dsl::lit_c<'\\'> >> ws + dsl::p<identifier> + ws + dsl::lit_c<'.'> + ws + dsl::recurse<struct expression>;
     static constexpr auto value = lexy::new_<ast::Abstraction, std::unique_ptr<ast::Expression>>;
 };
 
+struct nothing {
+    static constexpr auto rule = dsl::nullopt;
+    static inline constexpr auto value = lexy::callback<std::unique_ptr<ast::Expression>>(
+        [](lexy::nullopt) { return std::unique_ptr<ast::Expression>{}; });
+};
+
 struct subexpression : lexy::expression_production {
-    static constexpr auto atom = dsl::p<variable> | dsl::parenthesized(dsl::recurse<struct expression>);
+    static constexpr auto atom =
+        dsl::p<variable> | dsl::parenthesized(dsl::recurse<struct expression>) | dsl::else_ >> dsl::p<nothing>;
 
     struct application : dsl::infix_op_left {
-        static constexpr auto op = dsl::op(dsl::lit_c<' '>);
+        static constexpr auto op = dsl::op(dsl::lit_c<' '> >> dsl::while_(dsl::lit_c<' '>));
         using operand = dsl::atom;
     };
 
@@ -109,7 +107,10 @@ struct subexpression : lexy::expression_production {
 
     static constexpr auto value = lexy::callback<std::unique_ptr<ast::Expression>>(
         [](std::unique_ptr<ast::Expression> x) { return x; },
-        [](std::unique_ptr<ast::Expression> lhs, lexy::op<application::op>, std::unique_ptr<ast::Expression> rhs) {
+        [](std::unique_ptr<ast::Expression> lhs, lexy::op<application::op>,
+           std::unique_ptr<ast::Expression> rhs) -> std::unique_ptr<ast::Expression> {
+            if (!lhs) return rhs;
+            if (!rhs) return lhs;
             return std::make_unique<ast::Application>(std::move(lhs), std::move(rhs));
         });
 };
