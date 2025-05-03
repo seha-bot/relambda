@@ -58,11 +58,6 @@ namespace grammar {
 
 namespace dsl = lexy::dsl;
 
-struct whitespace {
-    static constexpr auto rule = dsl::whitespace(dsl::ascii::space);
-};
-static constexpr auto ws = dsl::inline_<whitespace>;
-
 struct identifier {
     static constexpr auto rule = [] {
         auto head = dsl::ascii::alpha_underscore;
@@ -84,13 +79,12 @@ struct variable {
 
 struct abstraction {
     static constexpr auto rule =
-        dsl::lit_c<'\\'> >> ws + dsl::p<identifier> + ws + dsl::lit_c<'.'> + ws + dsl::recurse<struct expression>;
+        dsl::lit_c<'\\'> >> dsl::p<identifier> + dsl::lit_c<'.'> + dsl::recurse<struct expression>;
     static constexpr auto value = lexy::new_<ast::Abstraction, std::unique_ptr<ast::Expression>>;
 };
 
 struct applications {
-    static constexpr auto rule =
-        dsl::list((dsl::p<variable> >> ws) | dsl::parenthesized(ws + dsl::recurse<struct expression> + ws));
+    static constexpr auto rule = dsl::list(dsl::p<variable> | dsl::parenthesized(dsl::recurse<struct expression>));
 
     static constexpr auto value = lexy::fold<std::unique_ptr<ast::Expression>>(
         nullptr,
@@ -102,7 +96,7 @@ struct applications {
 };
 
 struct expression {
-    // static constexpr auto whitespace = dsl::ascii::space;
+    static constexpr auto whitespace = dsl::ascii::space;
     static constexpr auto rule = dsl::p<abstraction> | dsl::p<applications>;
     static constexpr auto value = lexy::forward<std::unique_ptr<ast::Expression>>;
 };
