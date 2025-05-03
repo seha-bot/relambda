@@ -88,35 +88,22 @@ struct abstraction {
     static constexpr auto value = lexy::new_<ast::Abstraction, std::unique_ptr<ast::Expression>>;
 };
 
-struct nothing {
-    static constexpr auto rule = dsl::nullopt;
-    static inline constexpr auto value = lexy::callback<std::unique_ptr<ast::Expression>>(
-        [](lexy::nullopt) { return std::unique_ptr<ast::Expression>{}; });
-};
+struct applications {
+    static constexpr auto rule =
+        dsl::list((dsl::p<variable> >> ws) | dsl::parenthesized(ws + dsl::recurse<struct expression> + ws));
 
-struct subexpression : lexy::expression_production {
-    static constexpr auto atom =
-        dsl::p<variable> | dsl::parenthesized(dsl::recurse<struct expression>) | dsl::else_ >> dsl::p<nothing>;
-
-    struct application : dsl::infix_op_left {
-        static constexpr auto op = dsl::op(dsl::lit_c<' '> >> dsl::while_(dsl::lit_c<' '>));
-        using operand = dsl::atom;
-    };
-
-    using operation = application;
-
-    static constexpr auto value = lexy::callback<std::unique_ptr<ast::Expression>>(
-        [](std::unique_ptr<ast::Expression> x) { return x; },
-        [](std::unique_ptr<ast::Expression> lhs, lexy::op<application::op>,
-           std::unique_ptr<ast::Expression> rhs) -> std::unique_ptr<ast::Expression> {
-            if (!lhs) return rhs;
-            if (!rhs) return lhs;
-            return std::make_unique<ast::Application>(std::move(lhs), std::move(rhs));
+    static constexpr auto value = lexy::fold<std::unique_ptr<ast::Expression>>(
+        nullptr,
+        [](std::unique_ptr<ast::Expression> acc,
+           std::unique_ptr<ast::Expression> x) -> std::unique_ptr<ast::Expression> {
+            if (!acc) return x;
+            return std::make_unique<ast::Application>(std::move(acc), std::move(x));
         });
 };
 
 struct expression {
-    static constexpr auto rule = dsl::p<abstraction> | dsl::else_ >> dsl::p<subexpression>;
+    // static constexpr auto whitespace = dsl::ascii::space;
+    static constexpr auto rule = dsl::p<abstraction> | dsl::p<applications>;
     static constexpr auto value = lexy::forward<std::unique_ptr<ast::Expression>>;
 };
 
