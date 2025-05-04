@@ -1,6 +1,7 @@
 #ifndef AST_HPP
 #define AST_HPP
 
+#include <exception>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -11,7 +12,8 @@ namespace ast {
 
 struct Expression {
     virtual ~Expression() = default;
-    virtual std::string format() const = 0;
+    virtual std::string format() const noexcept = 0;
+    virtual std::string format_unlambda() const noexcept = 0;
 };
 
 using ExpressionPtr = std::unique_ptr<Expression>;
@@ -27,14 +29,18 @@ struct Variable : Expression {
     Variable(std::string name) : name(std::move(name)) {}
     std::string name;
 
-    std::string format() const override { return name; }
+    std::string format() const noexcept override { return name; }
+    std::string format_unlambda() const noexcept override {
+        std::cerr << "variables don't exist in unlambda";
+        std::terminate();
+    }
 };
 
 struct Application : Expression {
     Application(ExpressionPtr lhs, ExpressionPtr rhs) : lhs(std::move(lhs)), rhs(std::move(rhs)) {}
     ExpressionPtr lhs, rhs;
 
-    std::string format() const override {
+    std::string format() const noexcept override {
         std::string res;
         if (is_abstraction(lhs)) {
             res += '(' + lhs->format() + ')';
@@ -50,6 +56,10 @@ struct Application : Expression {
         }
         return res;
     }
+
+    std::string format_unlambda() const noexcept override {
+        return '`' + lhs->format_unlambda() + rhs->format_unlambda();
+    }
 };
 
 struct Abstraction : Expression {
@@ -57,17 +67,30 @@ struct Abstraction : Expression {
     std::string name;
     ExpressionPtr body;
 
-    std::string format() const override { return "\\" + name + '.' + body->format(); }
+    std::string format() const noexcept override { return "\\" + name + '.' + body->format(); }
+    std::string format_unlambda() const noexcept override {
+        std::cerr << "abstractions don't exist in unlambda";
+        std::terminate();
+    }
 };
 
 struct S : Expression {
-    std::string format() const override { return "S"; }
+    std::string format() const noexcept override { return "S"; }
+    std::string format_unlambda() const noexcept override { return "s"; }
 };
 struct K : Expression {
-    std::string format() const override { return "K"; }
+    std::string format() const noexcept override { return "K"; }
+    std::string format_unlambda() const noexcept override { return "k"; }
 };
 struct I : Expression {
-    std::string format() const override { return "I"; }
+    std::string format() const noexcept override { return "I"; }
+    std::string format_unlambda() const noexcept override { return "i"; }
+};
+
+// special unlambda delay combinator
+struct D : Expression {
+    std::string format() const noexcept override { return "D"; }
+    std::string format_unlambda() const noexcept override { return "d"; }
 };
 
 struct Definition {
