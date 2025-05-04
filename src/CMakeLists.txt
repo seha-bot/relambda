@@ -23,5 +23,10 @@ include(FetchContent)
 FetchContent_Declare(lexy URL https://lexy.foonathan.net/download/lexy-src.zip)
 FetchContent_MakeAvailable(lexy)
 
+# Parsing library for ease of linking with tests
+add_library(relambda_parsing INTERFACE)
+target_link_libraries(relambda_parsing INTERFACE relambda_core foonathan::lexy)
+target_sources(relambda_parsing INTERFACE parser.cpp)
+
 add_executable(relambda main.cpp)
-target_link_libraries(relambda PRIVATE relambda_core foonathan::lexy)
+target_link_libraries(relambda PRIVATE relambda_parsing)

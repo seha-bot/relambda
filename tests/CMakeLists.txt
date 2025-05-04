@@ -9,6 +9,6 @@ FetchContent_Declare(Catch2
 FetchContent_MakeAvailable(Catch2)
 
 add_executable(tests tests_main.cpp)
-target_link_libraries(tests PRIVATE mliti_core Catch2::Catch2WithMain)
+target_link_libraries(tests PRIVATE relambda_parsing Catch2::Catch2WithMain)
 
 add_test(NAME tests COMMAND tests)

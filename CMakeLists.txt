@@ -11,8 +11,8 @@ add_link_options(-fsanitize=address,undefined)
 
 add_subdirectory(src)
 
-# option(BUILD_TESTS "should tests be built" ON)
-# if(BUILD_TESTS)
-#     enable_testing()
-#     add_subdirectory(tests)
-# endif()
+option(BUILD_TESTS "should tests be built" ON)
+if(BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
