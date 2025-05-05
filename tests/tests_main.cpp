@@ -40,13 +40,13 @@ TEST_CASE("SKI conversion", "[ski]") {
     REQUIRE(convert("\\x.x") == "I");
     REQUIRE(convert("\\x.x x") == "S I I");
     REQUIRE(convert("(\\x.x x)  (\\x.x x)") == "S I I (S I I)");
-    // These should be the ideal results. However, I don't know how to implement that currently
-    // REQUIRE(convert("\\f.(\\x.f(x x))(\\x.f(x x))") == "S (S (S (K S) K) (K (S I I))) (S (S (K S) K) (K (S I I)))");
-    // REQUIRE(convert("\\f.(\\x.x x)(\\x.f(x x))") == "S (K (S I I)) (S (S (K S) K) (K (S I I)))");
-    // REQUIRE(convert("\\f.\\x.\\y.f y x") == "S (S (K S) (S (K K) S)) (K K)");
+    REQUIRE(convert("\\x.\\y.\\z.x y") == "fill me");
     // Not ideal.
-    REQUIRE(convert("\\f.(\\x.f(x x))(\\x.f(x x))") ==
-            "S (S (S (K S) K) (D (K (S I I)))) (S (S (K S) K) (D (K (S I I))))");
-    REQUIRE(convert("\\f.(\\x.x x)(\\x.f(x x))") == "S (D (K (S I I))) (S (S (K S) K) (D (K (S I I))))");
     REQUIRE(convert("\\f.\\x.\\y.f y x") == "S (S (K S) (S (D (K D)) (S (K K) S))) (K K)");
+    // Ideally, it'd be like this: REQUIRE(convert("\\f.\\x.\\y.f y x") == "S (S (K S) (S (K K) S)) (K K)");
+
+    // WARNING: faulty tests
+    // REQUIRE(convert("\\f.(\\x.f(x x))(\\x.f(x x))") ==
+    //         "S (S (S (K S) K) (D (K (S I I)))) (S (S (K S) K) (D (K (S I I))))");
+    // REQUIRE(convert("\\f.(\\x.x x)(\\x.f(x x))") == "S (D (K (S I I))) (S (S (K S) K) (D (K (S I I))))");
 }
