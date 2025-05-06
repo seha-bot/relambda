@@ -50,7 +50,7 @@ std::optional<std::string> translate(ast::Definitions&& defs, bool do_ski) {
             std::cerr << "multiple definitions for \"" << def.name << "\" detected.\n";
             return std::nullopt;
         }
-        def.value = conv::to_ski(std::move(def.value));
+        def.value = conv::to_ski(conv::make_lazy(std::move(def.value)));
     }
 
     bool really_bad = false;
@@ -87,8 +87,13 @@ std::optional<std::string> translate(ast::Definitions&& defs, bool do_ski) {
 
 int main(int argc, char *argv[]) {
     // auto res = parser::parse_string_expression("\\x.\\y.\\z.x z(y z)").value();
+    // // auto res = parser::parse_string_expression("\\_.(\\x.x x) (\\x.x x) _").value();
+    // res = conv::make_lazy(std::move(res));
+    // std::cout << res->format() << '\n';
+
     // res = conv::to_ski(std::move(res));
     // std::cout << res->format() << '\n';
+    // std::cout << res->format_unlambda({}) << '\n';
 
     if (argc == 1) {
         std::cerr << "must provide a filename\n";
@@ -106,17 +111,5 @@ int main(int argc, char *argv[]) {
 
 /*
 
-\x.print I
-S (K print) (KI)
-delay (K (print I))
-
-\x.W
-K W
-or
-\x.W
-\x.SII(SII)
-S(\x.SII)(\x.SII)
-S(K(SII))(K(SII))
-``s `k``sii `k``sii
 
 */

@@ -25,6 +25,25 @@ bool contains(ast::ExpressionPtr const& expr, std::string const& name) {
 
 #define DD(...) std::make_unique<ast::Application>(std::make_unique<ast::D>(), __VA_ARGS__)
 
+ast::ExpressionPtr make_lazy(ast::ExpressionPtr expr) {
+    if (is_abstraction(expr)) {
+        auto& abs = static_cast<ast::Abstraction&>(*expr);
+        abs.body = make_lazy(std::move(abs.body));
+        return expr;
+    } else if (is_application(expr)) {
+        auto& app = static_cast<ast::Application&>(*expr);
+        app.lhs = make_lazy(std::move(app.lhs));
+
+        if (!is_variable(app.rhs)) {
+            app.rhs = DD(make_lazy(std::move(app.rhs)));
+        }
+
+        return expr;
+    } else /* is_variable */ {
+        return expr;
+    }
+}
+
 ast::ExpressionPtr to_ski(ast::ExpressionPtr expr) {
     if (is_abstraction(expr)) {
         auto& abs = static_cast<ast::Abstraction&>(*expr);
@@ -37,29 +56,50 @@ ast::ExpressionPtr to_ski(ast::ExpressionPtr expr) {
             }
         }
 
-        // \x.F = D (K F) (F does not contain x)
+        // \x.F = K F (F does not contain x)
         if (!contains(abs.body, abs.name)) {
-            return std::make_unique<ast::Application>(std::make_unique<ast::K>(), to_ski(std::move(abs.body)));
+            if (is_variable(abs.body) || is_s(abs.body) || is_k(abs.body) || is_i(abs.body) || is_d(abs.body) ||
+                is_d_app(abs.body)) {
+                return std::make_unique<ast::Application>(std::make_unique<ast::K>(), to_ski(std::move(abs.body)));
+            }
+            return DD(std::make_unique<ast::Application>(std::make_unique<ast::K>(), to_ski(std::move(abs.body))));
         }
 
         // \x.F G = S(\x.F)(\x.G)
         if (is_application(abs.body)) {
             auto& app = static_cast<ast::Application&>(*abs.body);
 
-            // \x.F x = F
-            if (is_variable(app.rhs)) {
-                auto& var = static_cast<ast::Variable&>(*app.rhs);
-                if (abs.name == var.name) {
-                    if (!contains(app.lhs, abs.name)) {
-                        return std::move(app.lhs);
+            // \x.D (F x) = F | D F
+            if (is_d(app.lhs) && is_application(app.rhs)) {
+                auto& rhs_app = static_cast<ast::Application&>(*app.rhs);
+                if (is_variable(rhs_app.rhs)) {
+                    auto& var = static_cast<ast::Variable&>(*rhs_app.rhs);
+                    if (abs.name == var.name && !contains(rhs_app.lhs, abs.name)) {
+                        rhs_app.lhs = to_ski(std::move(rhs_app.lhs));
+                        if (is_variable(rhs_app.lhs) || is_s(rhs_app.lhs) || is_k(rhs_app.lhs) || is_i(rhs_app.lhs) ||
+                            is_d(rhs_app.lhs) || is_d_app(rhs_app.lhs)) {
+                            return std::move(rhs_app.lhs);
+                        }
+                        return DD(std::move(rhs_app.lhs));
                     }
                 }
             }
 
-            bool was_combinator = is_s(app.lhs) || is_k(app.lhs) || is_i(app.lhs) || is_d(app.lhs);
+            // \x.F x = F | D F
+            if (is_variable(app.rhs)) {
+                auto& var = static_cast<ast::Variable&>(*app.rhs);
+                if (abs.name == var.name && !contains(app.lhs, abs.name)) {
+                    app.lhs = to_ski(std::move(app.lhs));
+                    if (is_variable(app.lhs) || is_s(app.lhs) || is_k(app.lhs) || is_i(app.lhs) || is_d(app.lhs) ||
+                        is_d_app(app.lhs)) {
+                        return std::move(app.lhs);
+                    }
+                    return DD(std::move(app.lhs));
+                }
+            }
+
             auto fst = to_ski(std::make_unique<ast::Abstraction>(abs.name, std::move(app.lhs)));
-            auto snd = to_ski(std::make_unique<ast::Abstraction>(
-                abs.name, was_combinator ? std::move(app.rhs) : DD(std::move(app.rhs))));
+            auto snd = to_ski(std::make_unique<ast::Abstraction>(abs.name, std::move(app.rhs)));
             return std::make_unique<ast::Application>(
                 std::make_unique<ast::Application>(std::make_unique<ast::S>(), std::move(fst)), std::move(snd));
         }
@@ -69,8 +109,7 @@ ast::ExpressionPtr to_ski(ast::ExpressionPtr expr) {
     } else if (is_application(expr)) {
         auto& app = static_cast<ast::Application&>(*expr);
         app.lhs = to_ski(std::move(app.lhs));
-        app.rhs = to_ski(is_s(app.lhs) || is_k(app.lhs) || is_i(app.lhs) || is_d(app.lhs) ? std::move(app.rhs)
-                                                                                          : DD(std::move(app.rhs)));
+        app.rhs = to_ski(std::move(app.rhs));
         return expr;
     } else /* is_variable || is_s || is_k || is_i */ {
         return expr;

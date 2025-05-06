@@ -19,7 +19,7 @@ std::string convert(std::string_view src) {
     if (!res) {
         throw std::runtime_error{"parsing failed"};
     }
-    res = conv::to_ski(*std::move(res));
+    res = conv::to_ski(conv::make_lazy(*std::move(res)));
     return (*res)->format();
 }
 
@@ -39,10 +39,12 @@ TEST_CASE("SKI conversion", "[ski]") {
     REQUIRE(convert("\\x.\\y.x") == "K");
     REQUIRE(convert("\\x.x") == "I");
     REQUIRE(convert("\\x.x x") == "S I I");
-    REQUIRE(convert("(\\x.x x)  (\\x.x x)") == "S I I (S I I)");
-    REQUIRE(convert("\\x.\\y.\\z.x y") == "fill me");
+    REQUIRE(convert("(\\x.x x)  (\\x.x x)") == "S I I (D (S I I))");
+    // REQUIRE(convert("\\x.\\y.\\z.x y") == "fill me");
+    REQUIRE(convert("\\_.(\\x.x x) (\\x.x x)") == "D (K (S I I (D (S I I))))"); // lazy test
+    REQUIRE(convert("\\v.(\\x.x x) (\\x.x x) v") == "D (S I I (D (S I I)))"); // lazy test
     // Not ideal.
-    REQUIRE(convert("\\f.\\x.\\y.f y x") == "S (S (K S) (S (D (K D)) (S (K K) S))) (K K)");
+    REQUIRE(convert("\\f.\\x.\\y.f y x") == "S (S (K S) (S (K D) (S (K K) S))) (K K)");
     // Ideally, it'd be like this: REQUIRE(convert("\\f.\\x.\\y.f y x") == "S (S (K S) (S (K K) S)) (K K)");
 
     // WARNING: faulty tests
