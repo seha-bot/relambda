@@ -27,15 +27,18 @@ bool is_combinator(ast::ExpressionPtr const& expr) { return is_s(expr) || is_k(e
 
 bool match_app(ast::ExpressionPtr const& expr, auto&& lhs_f, auto&& rhs_f) {
     if (auto const *app = dynamic_cast<ast::Application *>(expr.get())) {
-        return std::invoke(std::forward<decltype(lhs_f)>(lhs_f), app->lhs) &&
-               std::invoke(std::forward<decltype(rhs_f)>(rhs_f), app->rhs);
+        return std::invoke(std::forward<decltype(lhs_f)>(lhs_f), std::as_const(app->lhs)) &&
+               std::invoke(std::forward<decltype(rhs_f)>(rhs_f), std::as_const(app->rhs));
     }
     return false;
 }
 
-bool is_safe(ast::ExpressionPtr const& expr) {
-    return match_app(expr, is_combinator, ast::is_variable) ||  // WARNING: this one is experimental and undocumented
-           is_variable(expr) || is_combinator(expr) || match_app(expr, ast::is_d, [](auto&&) { return true; });
+bool is_pure(ast::ExpressionPtr const& expr) {
+    // S pure pure (experimental and undocumented)
+    auto spp = match_app(expr, [](auto& expr) { return match_app(expr, ast::is_s, is_pure); }, is_pure);
+    return spp || match_app(expr, is_combinator, is_pure) ||       // WARNING: experimental and undocumented
+           match_app(expr, ast::is_variable, ast::is_variable) ||  // WARNING: experimental and undocumented
+           is_variable(expr) || is_combinator(expr) || match_app(expr, ast::is_d, [](auto&) { return true; });
 }
 
 ast::ExpressionPtr apply(ast::ExpressionPtr x, ast::ExpressionPtr y) {
@@ -81,7 +84,14 @@ std::pair<ast::ExpressionPtr, bool> identity(ast::ExpressionPtr expr) {
 std::pair<ast::ExpressionPtr, bool> constant_expression(ast::ExpressionPtr expr) {
     if (auto *abs = dynamic_cast<ast::Abstraction *>(expr.get())) {
         if (!mentions(abs->body, abs->name)) {
-            if (is_safe(abs->body)) {
+            // Q: will it be better to check if the body is pure AFTER transforming?
+            // Check if there are other places which would benefit from this.
+            // This could allow to only check for SKI purity. Instead of writing code to check wheter
+            // \x.x x is pure, we can transform to SII and check the S pure pure condition.
+            // Idk which consequences this change would make.
+            // NEW QUESTION WHICH COULD CLEAR THINGS UP:
+            // Does the T function preserve purity? Can it make an unpure function become pure and vice versa?
+            if (is_pure(abs->body)) {
                 return {apply(std::make_unique<ast::K>(), transform(std::move(abs->body))), true};
             }
             return {apply_d(apply(std::make_unique<ast::K>(), transform(std::move(abs->body)))), true};
@@ -104,7 +114,7 @@ std::pair<ast::ExpressionPtr, bool> application_in_abstraction(ast::ExpressionPt
     if (!mentions(app->lhs, abs->name)) {
         if (auto *var = dynamic_cast<ast::Variable *>(app->rhs.get())) {
             if (var->name == abs->name) {
-                if (is_safe(app->lhs)) {
+                if (is_pure(app->lhs)) {
                     return {transform(std::move(app->lhs)), true};
                 }
                 return {apply_d(transform(std::move(app->lhs))), true};
