@@ -2,7 +2,7 @@
 
 The compiler will attempt to simulate the "call by name" reduction strategy. That is, no reductions are performed inside abstractions and arguments are substituted into the body of an abstraction before the arguments are reduced.
 
-## Definitions
+## Definitions for this document
 
 A *definition* is a named expression introduced with `let`. An *abstraction* is a lambda (λ) followed by a name, a dot and an expression. A *variable* is a name which is introduced by an abstraction or a definition. A *combinator* is either `S`, or `K`, or `I` or `D`. An *expression* is either an abstraction, or a variable, or an application, or a combinator.
 
@@ -126,10 +126,11 @@ Formula: \
 
 ## Required pure expressions
 
-The following expressions are considered pure:
+The following expressions are always considered pure:
 - variables,
 - combinators,
 - applications whose left-hand side is `D`.
+<!-- - expressions inside pure definitions. -->
 
 [Note 1:
 
@@ -143,3 +144,41 @@ let main = (λx.x x) print # D will be applied to print in the preprocessing sta
 -- end example]
 
 -- end note]
+
+## Substituting variables
+
+WARNING: This section needs more work. What if we want the expression to be evaluated? Reflect on "The pure specifier".
+
+Any leftover variables after applying transformations will name a definition. They are substituted with the expression from the corresponding definition. If that expression is unpure, `D` is applied to it before substituting.
+
+[Example 1:
+```
+let print = "a" (λx.x)
+let main = print # main is D ("a" (λx.x))
+```
+-- end example]
+
+## The pure specifier
+
+A definition can be marked pure by adding the *pure specifier* before its name. A *pure definition* is a definition marked with the pure specifier. The expression inside a pure definition is considered pure.
+
+[Note 1: Substituting variables which name pure definitions will never introduce `D`. -- end note]
+
+[Example 1:
+```
+let pure my_i = λx.x # transforms to I
+let main = my_i my_i # substitutes to I I
+```
+-- end example]
+
+WARNING: I need to think more about this. How does this affect the subexpressions inside the top-level expression?
+Think about this:
+```
+let pure print_hi = "hi" (λx.x)
+let main = print_hi
+```
+And this:
+```
+let pure K_loop = λ_.(λx.x x) (λx.x x) # should also all the subexpressions be treated as pure?
+let main = K_loop
+```

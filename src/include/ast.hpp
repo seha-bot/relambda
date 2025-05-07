@@ -46,7 +46,7 @@ struct Variable : Expression {
             std::cerr << "logic_error: can't format undefined names\n";
             std::terminate();
         }
-        return it->value->format_unlambda(env);
+        return "`d" + it->value->format_unlambda(env);
     }
 };
 

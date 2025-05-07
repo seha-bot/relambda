@@ -1,6 +1,7 @@
 #include "converter.hpp"
 
-#include <optional>
+#include <functional>
+#include <utility>
 
 namespace {
 
@@ -24,31 +25,24 @@ bool mentions(ast::ExpressionPtr const& expr, std::string const& name) {
 
 bool is_combinator(ast::ExpressionPtr const& expr) { return is_s(expr) || is_k(expr) || is_i(expr) || is_d(expr); }
 
-// Why is this a macro?
-#define M_APP(x, l, r) (dynamic_cast<ast::Application *>(x) && l(static_cast<ast::Application *>(x)->lhs) && r(static_cast<ast::Application *>(x)->rhs))
-
-bool is_safe(ast::ExpressionPtr const& expr) {
-    if (auto *app = dynamic_cast<ast::Application *>(expr.get())) {
-        if (is_d(app->lhs)) {
-            return true;
-        }
+bool match_app(ast::ExpressionPtr const& expr, auto&& lhs_f, auto&& rhs_f) {
+    if (auto const *app = dynamic_cast<ast::Application *>(expr.get())) {
+        return std::invoke(std::forward<decltype(lhs_f)>(lhs_f), app->lhs) &&
+               std::invoke(std::forward<decltype(rhs_f)>(rhs_f), app->rhs);
     }
-    // WARNING: this is experimental and is not documented.
-    if (M_APP(expr.get(), is_combinator, is_variable)) {
-        return true;
-    }
-    // WARNING: faulty! is_variable should be is_local_variable
-    // OR, non-local variables should be substituted as (D nonlocal)
-    // decide and write.
-    // IDEA! you can mark non-local expressions as pure like:
-    // let pure f = \x.x
-    // and now you can substitute them without D!
-    return is_variable(expr) || is_combinator(expr);
+    return false;
 }
 
-// why are these macros?? FIX!
-#define APP std::make_unique<ast::Application>
-#define DAPP(...) APP(std::make_unique<ast::D>(), __VA_ARGS__)
+bool is_safe(ast::ExpressionPtr const& expr) {
+    return match_app(expr, is_combinator, ast::is_variable) ||  // WARNING: this one is experimental and undocumented
+           is_variable(expr) || is_combinator(expr) || match_app(expr, ast::is_d, [](auto&&) { return true; });
+}
+
+ast::ExpressionPtr apply(ast::ExpressionPtr x, ast::ExpressionPtr y) {
+    return std::make_unique<ast::Application>(std::move(x), std::move(y));
+}
+
+ast::ExpressionPtr apply_d(ast::ExpressionPtr x) { return apply(std::make_unique<ast::D>(), std::move(x)); }
 
 ast::ExpressionPtr preprocess(ast::ExpressionPtr expr) {
     if (is_abstraction(expr)) {
@@ -60,7 +54,7 @@ ast::ExpressionPtr preprocess(ast::ExpressionPtr expr) {
         app.lhs = preprocess(std::move(app.lhs));
 
         if (!is_variable(app.rhs)) {
-            app.rhs = DAPP(preprocess(std::move(app.rhs)));
+            app.rhs = apply_d(preprocess(std::move(app.rhs)));
         }
 
         return expr;
@@ -88,9 +82,9 @@ std::pair<ast::ExpressionPtr, bool> constant_expression(ast::ExpressionPtr expr)
     if (auto *abs = dynamic_cast<ast::Abstraction *>(expr.get())) {
         if (!mentions(abs->body, abs->name)) {
             if (is_safe(abs->body)) {
-                return {APP(std::make_unique<ast::K>(), transform(std::move(abs->body))), true};
+                return {apply(std::make_unique<ast::K>(), transform(std::move(abs->body))), true};
             }
-            return {DAPP(APP(std::make_unique<ast::K>(), transform(std::move(abs->body)))), true};
+            return {apply_d(apply(std::make_unique<ast::K>(), transform(std::move(abs->body)))), true};
         }
     }
     return {std::move(expr), false};
@@ -113,14 +107,14 @@ std::pair<ast::ExpressionPtr, bool> application_in_abstraction(ast::ExpressionPt
                 if (is_safe(app->lhs)) {
                     return {transform(std::move(app->lhs)), true};
                 }
-                return {DAPP(transform(std::move(app->lhs))), true};
+                return {apply_d(transform(std::move(app->lhs))), true};
             }
         }
     }
 
     app->lhs = transform(std::make_unique<ast::Abstraction>(abs->name, std::move(app->lhs)));
     app->rhs = transform(std::make_unique<ast::Abstraction>(abs->name, std::move(app->rhs)));
-    return {APP(APP(std::make_unique<ast::S>(), std::move(app->lhs)), std::move(app->rhs)), true};
+    return {apply(apply(std::make_unique<ast::S>(), std::move(app->lhs)), std::move(app->rhs)), true};
 }
 
 std::pair<ast::ExpressionPtr, bool> nested_abstraction(ast::ExpressionPtr expr) {
