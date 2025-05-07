@@ -4,17 +4,17 @@ The compiler will attempt to simulate the "call by name" reduction strategy. Tha
 
 ## Lazyness preprocessing (unverified)
 
-For each application `F G` in the lambda form, apply `D` to the right-hand side (`F (D G)`) if `G` is unsafe.
+For each application `F G` in the lambda form, apply `D` to the right-hand side (`F (D G)`) if `G` is unpure.
 
 [Note 1: This will be applied as the first step in the compilation and forces lazy evaluation. -- end note]
 
-[Note 2 (unverified): Local variables are always safe because the to-be-substituted expression will already be delayed elsewhere by this rule. -- end note]
+[Note 2: Variables are always pure because the to-be-substituted expression will already be delayed elsewhere. -- end note]
 
-[Note 3: Expressions in the form `D F` are always safe because evaluating them does nothing. -- end note]
+[Note 3: Expressions in the form `D F` are always pure because evaluating them does nothing. -- end note]
 
-[Example 1 (unverified for the same reason as Note 2):
+[Example 1:
 
-`λx.x x` can remain as-is because the right-hand side of the application is a local variable.
+`λx.x x` can remain as-is because the right-hand side of the application is a variable.
 
 -- end example]
 
@@ -36,9 +36,9 @@ Missing definitions: local variable, combinator, mention, expression, lambda for
 
 In the following sections, `F` and `G` denote arbitary expressions.
 
-An expression `F` is *safe* if evaluating it terminates and produces no side-effects. An expression `F` is *unsafe* if it is not safe.
+An expression `F` is *pure* if evaluating it terminates and produces no side-effects. An expression `F` is *unpure* if it is not pure.
 
-[Note 1: It is not always possible to tell if an expression is safe, so compilers are allowed to treat any safe expression as unsafe. -- end note]
+[Note 1: It is not always possible to tell if an expression is pure, so compilers are allowed to treat any pure expression as unpure. -- end note]
 
 ### Identity
 
@@ -47,13 +47,11 @@ An abstraction in the form `λx.x` shall be transformed to `I`.
 Formula: \
 `T (λx.x) = I`
 
-### Constant expressions
+### Constant expression
 
 An abstraction in the form `λx.F` where `F` does not mention `x` shall be transformed to:
-- If `F` is safe, `K F`.
-- Otherwise, `D (K F)`.
-
-[Note 1 (unverified): Local variables which are different from `x` and combinators are considered safe, so it's ok to omit `D` for them. -- end note]
+- If `F` is pure, `K (T F)`.
+- Otherwise, `D (K (T F))`.
 
 [Example 1:
 ```
@@ -69,7 +67,7 @@ In the preprocessing stage, this will become `(λy.λx.y) (D print)`. Then, we c
 
 -- end example]
 
-[Note 2: The above example does not prove anything and just shows a case where it works. I don't know how to prove this. -- end note]
+[Note 1: The above example does not prove anything and just shows a case where it works. I don't know how to prove this. -- end note]
 
 [Example 2:
 ```
@@ -81,14 +79,14 @@ let main = λx.print # transformed to D (K print)
 -- end example]
 
 Formula: \
-`T (λx.F) = K F` if `F` doesn't mention `x` and `F` is safe \
-`T (λx.F) = D (K F)` if `F` doesn't mention `x`
+`T (λx.F) = K (T F)` if `F` doesn't mention `x` and `F` is pure \
+`T (λx.F) = D (K (T F))` if `F` doesn't mention `x`
 
-### Applications in abstractions
+### Application in abstraction
 
 For an abstraction `A` in the form `λx.F G`:
 - If `F` doesn't mention `x` and `G` is `x`:
-    - If `F` is safe, `A` will be transformed to `T F`.
+    - If `F` is pure, `A` will be transformed to `T F`.
     - Otherwise, `A` will be transformed to `D (T F)`.
 - Otherwise, `A` will be transformed to `S (T (λx.F)) (T (λx.G))`.
 
@@ -101,18 +99,25 @@ let c = λx."a" x # transforms to D "a"
 -- end example]
 
 Formula: \
-`T (λx.F x) = T F` if `F` doesn't mention `x` and `F` is safe \
-`T (λx.F x) = D (T F)` if `F` doesn't mention `x` and `F` is unsafe \
+`T (λx.F x) = T F` if `F` doesn't mention `x` and `F` is pure \
+`T (λx.F x) = D (T F)` if `F` doesn't mention `x` and `F` is unpure \
 `T (λx.F G) = S (T (λx.F)) (T (λx.G))`\
 
-### Applications
+### Nested abstraction
+
+An abstraction in the form `λx.λy.F` shall be transformed to: `T (λx.T (λy.F))`
+
+Formula: \
+`T (λx.λy.F) = T (λx.T (λy.F))`
+
+### Application
 
 An application in the form `F G` shall be transformed to: `(T F) (T G)`.
 
 Formula: \
 `T (F G) = (T F) (T G)`
 
-### Combinators and variables
+### Combinator or variable
 
 An expression `F` shall be its own transformation if it is a combinator or a variable.
 
