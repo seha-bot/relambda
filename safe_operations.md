@@ -1,16 +1,24 @@
-# List of known safe operations which will be applied by the compiler
+# List of known non-destructive operations applied by the compiler
 
 The compiler will attempt to simulate the "call by name" reduction strategy. That is, no reductions are performed inside abstractions and arguments are substituted into the body of an abstraction before the arguments are reduced.
 
+## Definitions
+
+A *definition* is a named expression introduced with `let`. An *abstraction* is a lambda (λ) followed by a name, a dot and an expression. A *variable* is a name which is introduced by an abstraction or a definition. A *combinator* is either `S`, or `K`, or `I` or `D`. An *expression* is either an abstraction, or a variable, or an application, or a combinator.
+
+To *evaluate* an expression is to reduce it to its normal form according to the "call by name" reduction strategy.
+
+Missing definitions: application, mention.
+
+An expression `F` is *pure* if evaluating it terminates and produces no side-effects. An expression `F` is *unpure* if it is not pure.
+
+[Note 1: It is not always possible to tell if an expression is pure, so compilers are allowed to treat any pure expression as unpure. There are some expressions which are [required](##-required-pure-expressions) to be treated as pure. -- end note]
+
 ## Lazyness preprocessing (unverified)
 
-For each application `F G` in the lambda form, apply `D` to the right-hand side (`F (D G)`) if `G` is unpure.
+For each application `F G`, apply `D` to the right-hand side (`F (D G)`) if `G` is unpure.
 
-[Note 1: This will be applied as the first step in the compilation and forces lazy evaluation. -- end note]
-
-[Note 2: Variables are always pure because the to-be-substituted expression will already be delayed elsewhere. -- end note]
-
-[Note 3: Expressions in the form `D F` are always pure because evaluating them does nothing. -- end note]
+[Note 1: This will be applied as the first step of the compilation and it forces lazy evaluation. -- end note]
 
 [Example 1:
 
@@ -30,15 +38,7 @@ For each application `F G` in the lambda form, apply `D` to the right-hand side 
 
 ## Transformations
 
-After the preprocessing, the `T` function will be applied to the entire program. This function transforms the program according to the rules in the following sections.
-
-Missing definitions: local variable, combinator, mention, expression, lambda form, evaluate.
-
-In the following sections, `F` and `G` denote arbitary expressions.
-
-An expression `F` is *pure* if evaluating it terminates and produces no side-effects. An expression `F` is *unpure* if it is not pure.
-
-[Note 1: It is not always possible to tell if an expression is pure, so compilers are allowed to treat any pure expression as unpure. -- end note]
+After the preprocessing stage, the `T` function will be applied to the entire program. This function transforms the program according to the rules in the following sections. In the following sections, `F` and `G` denote arbitrary expressions.
 
 ### Identity
 
@@ -123,3 +123,23 @@ An expression `F` shall be its own transformation if it is a combinator or a var
 
 Formula: \
 `T F = F` if `F` is a combinator or a variable
+
+## Required pure expressions
+
+The following expressions are considered pure:
+- variables,
+- combinators,
+- applications whose left-hand side is `D`.
+
+[Note 1:
+
+Variables are pure because the to-be-substituted expression will already be delayed elsewhere.
+
+[Example 1:
+```
+let print = # some side-effect
+let main = (λx.x x) print # D will be applied to print in the preprocessing stage, so there is no need to also apply D to the right-hand side x.
+```
+-- end example]
+
+-- end note]
