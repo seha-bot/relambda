@@ -12,7 +12,7 @@ Missing definitions: application, mention.
 
 An expression `F` is *pure* if evaluating it terminates and produces no side-effects. An expression `F` is *unpure* if it is not pure.
 
-[Note 1: It is not always possible to tell if an expression is pure, so compilers are allowed to treat any pure expression as unpure. There are some expressions which are [required](##-required-pure-expressions) to be treated as pure. -- end note]
+[Note 1: It is not always possible to tell if an expression is pure, so compilers are allowed to treat any pure expression as unpure. There are some expressions which are required to be treated as pure. -- end note]
 
 ## Lazyness preprocessing (unverified)
 
@@ -39,6 +39,8 @@ For each application `F G`, apply `D` to the right-hand side (`F (D G)`) if `G` 
 ## Transformations
 
 After the preprocessing stage, the `T` function will be applied to the entire program. This function transforms the program according to the rules in the following sections. In the following sections, `F` and `G` denote arbitrary expressions.
+
+[Note 1: The `T` function preserves purity, so implementations can check if an expression is pure either before or after transforming. -- end note]
 
 ### Identity
 
@@ -101,7 +103,7 @@ let c = λx."a" x # transforms to D "a"
 Formula: \
 `T (λx.F x) = T F` if `F` doesn't mention `x` and `F` is pure \
 `T (λx.F x) = D (T F)` if `F` doesn't mention `x` and `F` is unpure \
-`T (λx.F G) = S (T (λx.F)) (T (λx.G))`\
+`T (λx.F G) = S (T (λx.F)) (T (λx.G))`
 
 ### Nested abstraction
 

@@ -86,7 +86,9 @@ std::optional<std::string> translate(ast::Definitions&& defs, bool do_ski) {
 }
 
 int main(int argc, char *argv[]) {
+    // auto res = parser::parse_string_expression("(\\x.\\y.y x) p1 p2").value();
     // auto res = parser::parse_string_expression("\\f.(\\x.x x) (\\x.f(x x))").value();
+    // auto res = parser::parse_string_expression("\\f.\\x.\\y.f (x y)").value();
     // res = conv::to_ski(std::move(res));
     // std::cout << res->format() << '\n';
     // std::cout << res->format_unlambda({}) << '\n';

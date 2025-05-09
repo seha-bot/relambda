@@ -36,8 +36,7 @@ bool match_app(ast::ExpressionPtr const& expr, auto&& lhs_f, auto&& rhs_f) {
 bool is_pure(ast::ExpressionPtr const& expr) {
     // S pure pure (experimental and undocumented)
     auto spp = match_app(expr, [](auto& expr) { return match_app(expr, ast::is_s, is_pure); }, is_pure);
-    return spp || match_app(expr, is_combinator, is_pure) ||       // WARNING: experimental and undocumented
-           match_app(expr, ast::is_variable, ast::is_variable) ||  // WARNING: experimental and undocumented
+    return spp || match_app(expr, is_combinator, is_pure) ||  // WARNING: experimental and undocumented
            is_variable(expr) || is_combinator(expr) || match_app(expr, ast::is_d, [](auto&) { return true; });
 }
 
@@ -51,17 +50,13 @@ ast::ExpressionPtr preprocess(ast::ExpressionPtr expr) {
     if (is_abstraction(expr)) {
         auto& abs = static_cast<ast::Abstraction&>(*expr);
         abs.body = preprocess(std::move(abs.body));
-        return expr;
+        return std::make_unique<ast::Abstraction>("_", std::move(expr));
     } else if (is_application(expr)) {
         auto& app = static_cast<ast::Application&>(*expr);
         app.lhs = preprocess(std::move(app.lhs));
-
-        if (!is_variable(app.rhs)) {
-            app.rhs = apply_d(preprocess(std::move(app.rhs)));
-        }
-
-        return expr;
-    } else /* is_variable */ {
+        app.rhs = preprocess(std::move(app.rhs));
+        return apply(apply(std::move(app.lhs), std::make_unique<ast::I>()), std::move(app.rhs));
+    } else {
         return expr;
     }
 }
@@ -84,17 +79,11 @@ std::pair<ast::ExpressionPtr, bool> identity(ast::ExpressionPtr expr) {
 std::pair<ast::ExpressionPtr, bool> constant_expression(ast::ExpressionPtr expr) {
     if (auto *abs = dynamic_cast<ast::Abstraction *>(expr.get())) {
         if (!mentions(abs->body, abs->name)) {
-            // Q: will it be better to check if the body is pure AFTER transforming?
-            // Check if there are other places which would benefit from this.
-            // This could allow to only check for SKI purity. Instead of writing code to check wheter
-            // \x.x x is pure, we can transform to SII and check the S pure pure condition.
-            // Idk which consequences this change would make.
-            // NEW QUESTION WHICH COULD CLEAR THINGS UP:
-            // Does the T function preserve purity? Can it make an unpure function become pure and vice versa?
+            abs->body = transform(std::move(abs->body));
             if (is_pure(abs->body)) {
-                return {apply(std::make_unique<ast::K>(), transform(std::move(abs->body))), true};
+                return {apply(std::make_unique<ast::K>(), std::move(abs->body)), true};
             }
-            return {apply_d(apply(std::make_unique<ast::K>(), transform(std::move(abs->body)))), true};
+            return {apply_d(apply(std::make_unique<ast::K>(), std::move(abs->body))), true};
         }
     }
     return {std::move(expr), false};
@@ -114,10 +103,11 @@ std::pair<ast::ExpressionPtr, bool> application_in_abstraction(ast::ExpressionPt
     if (!mentions(app->lhs, abs->name)) {
         if (auto *var = dynamic_cast<ast::Variable *>(app->rhs.get())) {
             if (var->name == abs->name) {
+                app->lhs = transform(std::move(app->lhs));
                 if (is_pure(app->lhs)) {
-                    return {transform(std::move(app->lhs)), true};
+                    return {std::move(app->lhs), true};
                 }
-                return {apply_d(transform(std::move(app->lhs))), true};
+                return {apply_d(std::move(app->lhs)), true};
             }
         }
     }
@@ -200,5 +190,7 @@ ast::ExpressionPtr transform(ast::ExpressionPtr expr) {
 }  // namespace
 
 ast::ExpressionPtr conv::to_ski(ast::ExpressionPtr expr) {
+    // std::cout << preprocess(std::move(expr))->format() << std::endl;
+    // throw 0;
     return transformations::transform(preprocess(std::move(expr)));
 }
