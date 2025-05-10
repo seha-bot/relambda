@@ -34,10 +34,13 @@ bool match_app(ast::ExpressionPtr const& expr, auto&& lhs_f, auto&& rhs_f) {
 }
 
 bool is_pure(ast::ExpressionPtr const& expr) {
+    // return is_variable(expr) || is_combinator(expr);
+
+    auto any = [](auto&) { return true; };
     // S pure pure (experimental and undocumented)
     auto spp = match_app(expr, [](auto& expr) { return match_app(expr, ast::is_s, is_pure); }, is_pure);
-    return spp || match_app(expr, is_combinator, is_pure) ||  // WARNING: experimental and undocumented
-           is_variable(expr) || is_combinator(expr) || match_app(expr, ast::is_d, [](auto&) { return true; });
+    return is_string(expr) || spp || match_app(expr, is_combinator, is_pure) ||  // WARNING: experimental and undocumented
+           is_variable(expr) || is_combinator(expr) || match_app(expr, ast::is_d, any);
 }
 
 ast::ExpressionPtr apply(ast::ExpressionPtr x, ast::ExpressionPtr y) {
@@ -55,7 +58,15 @@ ast::ExpressionPtr preprocess(ast::ExpressionPtr expr) {
         auto& app = static_cast<ast::Application&>(*expr);
         app.lhs = preprocess(std::move(app.lhs));
         app.rhs = preprocess(std::move(app.rhs));
-        return apply(apply(std::move(app.lhs), std::make_unique<ast::I>()), std::move(app.rhs));
+        return std::make_unique<ast::Abstraction>(
+            "_",
+            apply(                                                                                 //
+                apply(apply(std::move(app.lhs), std::make_unique<ast::I>()), std::move(app.rhs)),  //
+                std::make_unique<ast::I>()                                                         //
+                )                                                                                  //
+        );
+    } else if (is_string(expr)) {
+        return std::make_unique<ast::Abstraction>("_", std::move(expr));
     } else {
         return expr;
     }
@@ -139,8 +150,8 @@ std::pair<ast::ExpressionPtr, bool> application(ast::ExpressionPtr expr) {
     return {std::move(expr), false};
 }
 
-std::pair<ast::ExpressionPtr, bool> combinator_or_variable(ast::ExpressionPtr expr) {
-    if (is_combinator(expr) || is_variable(expr)) {
+std::pair<ast::ExpressionPtr, bool> combinator_or_variable_or_string(ast::ExpressionPtr expr) {
+    if (is_combinator(expr) || is_variable(expr) || is_string(expr)) {
         return {std::move(expr), true};
     }
     return {std::move(expr), false};
@@ -172,7 +183,7 @@ ast::ExpressionPtr transform(ast::ExpressionPtr expr) {
     if (ok) {
         return expr;
     }
-    std::tie(expr, ok) = combinator_or_variable(std::move(expr));
+    std::tie(expr, ok) = combinator_or_variable_or_string(std::move(expr));
     if (ok) {
         return expr;
     }

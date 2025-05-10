@@ -15,7 +15,9 @@ namespace dsl = lexy::dsl;
 
 struct identifier {
     static constexpr auto rule = [] {
+        // Alphabetic character or an underscore.
         auto head = dsl::ascii::alpha_underscore;
+        // Alphabetic character or a digit or an underscore.
         auto tail = dsl::ascii::alpha_digit_underscore;
         auto id = dsl::identifier(head, tail);
 
@@ -25,6 +27,22 @@ struct identifier {
     }();
 
     static constexpr auto value = lexy::as_string<std::string>;
+};
+
+struct string {
+    static constexpr auto escaped_symbols = lexy::symbol_table<char>  //
+                                                .map<'"'>('"')
+                                                .map<'\\'>('\\')
+                                                .map<'n'>('\n');
+
+    static constexpr auto rule = [] {
+        // WARNING: Faulty. The grammar does not specify it like this.
+        auto c = dsl::ascii::character - dsl::ascii::control;
+        auto escape = dsl::backslash_escape.symbol<escaped_symbols>();
+        return dsl::quoted(c, escape);
+    }();
+
+    static constexpr auto value = lexy::as_string<std::string> >> lexy::new_<ast::String, ast::ExpressionPtr>;
 };
 
 struct variable {
@@ -39,7 +57,7 @@ struct abstraction {
 };
 
 struct applications {
-    static constexpr auto rule = dsl::list(dsl::p<variable> | dsl::parenthesized(dsl::recurse<struct expression>));
+    static constexpr auto rule = dsl::list(dsl::p<variable> | dsl::p<string> | dsl::parenthesized(dsl::recurse<struct expression>));
 
     static constexpr auto value =
         lexy::fold<ast::ExpressionPtr>(nullptr, [](ast::ExpressionPtr acc, ast::ExpressionPtr x) -> ast::ExpressionPtr {

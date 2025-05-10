@@ -29,6 +29,7 @@ struct Expression {
 bool is_variable(ExpressionPtr const& expr);
 bool is_abstraction(ExpressionPtr const& expr);
 bool is_application(ExpressionPtr const& expr);
+bool is_string(ExpressionPtr const& expr);
 bool is_s(ExpressionPtr const& expr);
 bool is_k(ExpressionPtr const& expr);
 bool is_i(ExpressionPtr const& expr);
@@ -46,7 +47,7 @@ struct Variable : Expression {
             std::cerr << "logic_error: can't format undefined names\n";
             std::terminate();
         }
-        return "`d" + it->value->format_unlambda(env);
+        return it->value->format_unlambda(env);
     }
 };
 
@@ -85,6 +86,20 @@ struct Abstraction : Expression {
     std::string format_unlambda(Definitions const&) const noexcept override {
         std::cerr << "abstractions don't exist in unlambda\n";
         std::terminate();
+    }
+};
+
+struct String : Expression {
+    String(std::string value) : value(std::move(value)) {}
+    std::string value;
+
+    std::string format() const noexcept override { return '"' + value + '"'; }
+    std::string format_unlambda(Definitions const&) const noexcept override {
+        if (value.size() != 1) {
+            std::cerr << "strings of sizes other than 1 are not supported yet\n";
+            std::terminate();
+        }
+        return '.' + value;
     }
 };
 

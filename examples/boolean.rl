@@ -5,4 +5,4 @@ let and = \lhs.\rhs.lhs rhs false
 let not = \x.x false true
 let infix_or = true
 
-let main = and (true infix_or((\x.false)false)) (not false)
+let main = and (true infix_or((\x.false)false)) (not false) "a" "b" (\x.x)

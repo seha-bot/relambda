@@ -30,6 +30,8 @@ std::vector<std::string> missing_names(ast::ExpressionPtr& def, std::unordered_s
             loc_env.erase(abs->name);
         }
         return res;
+    } else if (dynamic_cast<ast::String *>(def.get())) {
+        return {};
     } else {
         throw std::logic_error{"unexpected ast node"};
     }
@@ -80,19 +82,16 @@ std::optional<std::string> translate(ast::Definitions&& defs, bool do_ski) {
         return it->value->format();
     }
     return it->value->format_unlambda(defs);
-
-    // auto it = std::ranges::find_if(defs, [](ast::Definition const& x) { return x.name == "Y"; });
-    // return it->value->format();
 }
 
-int main(int argc, char *argv[]) {
-    // auto res = parser::parse_string_expression("(\\x.\\y.y x) p1 p2").value();
-    // auto res = parser::parse_string_expression("\\f.(\\x.x x) (\\x.f(x x))").value();
-    // auto res = parser::parse_string_expression("\\f.\\x.\\y.f (x y)").value();
-    // res = conv::to_ski(std::move(res));
-    // std::cout << res->format() << '\n';
-    // std::cout << res->format_unlambda({}) << '\n';
+// int main() {
+//     auto res = parser::parse_string_expression(R"( (\f.(\x.x x) (\x.f(x x))) "a" )").value();
+//     res = conv::to_ski(std::move(res));
+//     std::cout << res->format() << '\n';
+//     std::cout << res->format_unlambda({}) << '\n';
+// }
 
+int main(int argc, char *argv[]) {
     if (argc == 1) {
         std::cerr << "must provide a filename\n";
         return EXIT_FAILURE;
