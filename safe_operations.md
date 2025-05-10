@@ -16,23 +16,30 @@ An expression `F` is *pure* if evaluating it terminates and produces no side-eff
 
 ## Lazyness preprocessing (unverified)
 
-For each application `F G`, apply `D` to the right-hand side (`F (D G)`) if `G` is unpure.
+Since the source language is lazy, if it were to be translated without preprocessing, there would be differences in execution since unlambda evaluates expressions eagerly. To make the program lazy, evaluation of expressions must be delayed. The entire source program is passed to a function named `L`, which is described below.
 
-[Note 1: This will be applied as the first step of the compilation and it forces lazy evaluation. -- end note]
+Formula: \
+`L str = λ_.str` \
+`L x = x` \
+`L (λx.F) = λ_.λx.L F` \
+`L (F G) = λ_.L F I (L G) I`
+
+<!-- If the top-level expression in main is an application, the entire program is applied to `I` to force evaluation of the final fuck. -->
+
+<!-- (\_.(\_.\x.\_.x I x I) I (\_.\x.\_.x I x I) I) I -->
+
+<!-- 
+
+(\_."1" I) I
+
+ -->
+
+<!-- TODO: finish note. Link to section (and finish writing the fucking section). -->
+[Note 1: When substituting variables which are definition names, special rules apply. -- end note]
 
 [Example 1:
-
-`λx.x x` can remain as-is because the right-hand side of the application is a variable.
-
--- end example]
-
-[Example 2:
 ```
-# We don't expect this to print anything,
-# so `D` will be applied to the right-hand side
-# to prevent eager evaluation in unlambda.
-(λx.x) ("a" (\x.x))
-# Preprocessed to (λx.x) (D ("a" (\x.x)))
+let main = (λx.λy.y x) ("1" (λx.x)) ("2" (λx.x))
 ```
 -- end example]
 
@@ -119,12 +126,14 @@ An application in the form `F G` shall be transformed to: `(T F) (T G)`.
 Formula: \
 `T (F G) = (T F) (T G)`
 
-### Combinator or variable
+<!-- This needs a better name! -->
+### Combinator or variable or string
 
-An expression `F` shall be its own transformation if it is a combinator or a variable.
+<!-- TODO: this only works for single-char strings. Longer strings produce side-effects. -->
+An expression `F` shall be its own transformation if it is a combinator or a variable or a string.
 
 Formula: \
-`T F = F` if `F` is a combinator or a variable
+`T F = F` if `F` is a combinator or a variable or a string
 
 ## Required pure expressions
 
